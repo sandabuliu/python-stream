@@ -1,0 +1,15 @@
+[nginx]
+type=regex
+rule=(?P<remote_addr>(((25[0-5]|2[0-4]\d|((1\d{2})|([1-9]?\d)))\.){3}(25[0-5]|2[0-4]\d|((1\d{2})|([1-9]?\d))))) (?P<mark>.*?) (?P<remote_user>.*?) \[(?P<time_local>\d{2}/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/\d{4}:\d{2}:\d{2}:\d{2})( \+\d{4})?\] "(?P<request>(?P<method>(OPTIONS|HEAD|GET|POST|PUT|DELETE|TRACE|CONNECT)) (?P<path>.*?) (?P<version>.*?)|.*?)" (?P<status>\d+?) (?P<body_bytes_sent>.*?) "(?P<http_referer>.*?)" "(?P<http_user_agent>.*?)"
+fields={"status": "status", "remote_user": "remote_user", "http_referer": "http_referer", "remote_addr": "remote_addr", "request": "request", "version": "version", "http_user_agent": "http_user_agent", "path": "path", "method": "method"}
+subrules={"body_bytes_sent": "nginx_bytes_sent", "time_local": "nginx_time"}
+
+[nginx_bytes_sent]
+type=type
+rule=number
+fields={"body_bytes_sent": "0"}
+
+[nginx_time]
+type=type
+rule=date
+fields={"time_local": "0"}
