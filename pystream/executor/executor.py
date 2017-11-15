@@ -49,16 +49,17 @@ class Executor(object):
         return item
 
     def handle_exception(self, item, e):
-        logger.warn('%s (%s) handled failed, cause: %s' % (self.name, self.__class__.__name__, e))
+        logger.warn('%s (%s) handled failed, cause: %s, data: %s' % (self.name, self.__class__.__name__, e, [item]))
 
     def handle_event(self, event):
         return None
 
     def __or__(self, executor):
-        executor._source = self
-        self._output = executor
-        while not executor._output:
-            executor = executor._output
+        source = executor             # type: Executor
+        while source._source:
+            source = source._source
+        source._source = self
+        self._output = source
         return executor
 
     @property
@@ -132,7 +133,7 @@ class Reduce(Executor):
     def __iter__(self):
         for item in super(Reduce, self).__iter__():
             yield item
-        if self.window.data:
+        if not self.window.empty:
             yield self.func(self.window.data)
 
     def handle_event(self, event):

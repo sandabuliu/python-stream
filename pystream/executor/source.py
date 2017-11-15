@@ -7,9 +7,9 @@ import time
 import glob
 import logging
 
-from event import Event
-from utils import ifilter
 from executor import Executor
+from event import Event, is_event
+from utils import ifilter, endpoint
 
 __author__ = 'tong'
 
@@ -141,14 +141,6 @@ class File(Executor):
         if self.startline < 0:
             self.stream.seek(0, 2)
 
-    @staticmethod
-    def endpoint(fp):
-        pos = fp.tell()
-        fp.seek(0, 2)
-        end = fp.tell()
-        fp.seek(pos)
-        return end
-
     def open(self, filename):
         self.filename = filename
         logger.info('SOURCE FILE dumping %s' % filename)
@@ -180,8 +172,8 @@ class File(Executor):
                 timer = time.time()
                 yield Event.IDLE
                 sleep(self.confirm_wait - (time.time() - timer))
-            endpoint = self.endpoint(fp)
-            if endpoint <= fp.tell() or endpoint <= endpos:
+            ep = endpoint(fp)
+            if ep <= fp.tell() or ep <= endpos:
                 break
         fp.close()
 
@@ -243,35 +235,57 @@ class Csv(File):
 
 
 class Socket(Executor):
-    def __init__(self, address, sendable, initialize=None, deserialize=None, is_empty=None, **kwargs):
-        import socket
+    def __init__(self, address, **kwargs):
         super(Socket, self).__init__(**kwargs)
-        socket_af = socket.AF_UNIX if isinstance(address, basestring) else socket.AF_INET
-        self.sock = socket.socket(socket_af, socket.SOCK_STREAM)
-        self.sock.connect(address)
-        self.sendable = sendable
-        self.initialize = initialize
-        self.deserialize = deserialize
-        self.is_empty = is_empty or (lambda x: not x)
-        self.counter = 0
+        self.address = address
+
+    def initialize(self):
+        import socket
+        socket_af = socket.AF_UNIX if isinstance(self.address, basestring) else socket.AF_INET
+        sock = socket.socket(socket_af, socket.SOCK_STREAM)
+        sock.connect(self.address)
+        sock.setblocking(False)
+        return sock
+
+    def read(self, sock):
+        import socket
+        try:
+            msg = sock.recv(1024)
+            if not msg:
+                return None
+            return msg
+        except socket.error, e:
+            if e.errno == 35:
+                return Event.IDLE
+            else:
+                raise Exception('socket %s(%s) error' % (self.address, sock.fileno()))
+
+    def handle(self, message):
+        if not message:
+            return '', []
+        if '\n' not in message:
+            data = ''
+        else:
+            data, message = message.rsplit('\n', 1)
+        return message, data.split('\n') if data else []
 
     def __iter__(self):
-        if self.initialize:
-            self.initialize(self.sock)
-        fp = self.sock.makefile(mode='r')
+        sock = self.initialize()
+        message = ''
         while True:
-            self.sock.send(self.sendable())
-            message = fp.readline()
-            if self.deserialize:
-                message = self.deserialize(message)
-            if self.is_empty(message):
-                yield Event.IDLE
-                time.sleep(2**self.counter)
-                if self.counter < 60:
-                    self.counter += 1
-                continue
-            yield message
-            self.counter = 0
+            data = self.read(sock)
+            if data is None:
+                break
+            if is_event(data):
+                yield data
+                if not message:
+                    time.sleep(1)
+                    continue
+            else:
+                message += data
+            message, items = self.handle(message)
+            for item in items:
+                yield item
 
 
 class Kafka(Executor):

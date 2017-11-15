@@ -13,14 +13,11 @@ logger = logging.getLogger('stream.logger')
 
 class TCPClient(dispatcher):
     def __init__(self, address):
-        import socket
         dispatcher.__init__(self)
-        socket_af = socket.AF_UNIX if isinstance(address, basestring) else socket.AF_INET
-        self.create_socket(socket_af, socket.SOCK_STREAM)
-        self.connect(address)
         self.message = None
         self.iterator = None
         self._source = None
+        self.address = address
 
     def handle_connect(self):
         pass
@@ -48,7 +45,11 @@ class TCPClient(dispatcher):
         logger.debug('OUTPUT socket a message(%s)' % sent)
 
     def start(self):
+        import socket
         import asyncore
+        socket_af = socket.AF_UNIX if isinstance(self.address, basestring) else socket.AF_INET
+        self.create_socket(socket_af, socket.SOCK_STREAM)
+        self.connect(self.address)
         self.iterator = iter(self.source)
         asyncore.loop(use_poll=True)
 

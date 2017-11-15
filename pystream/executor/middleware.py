@@ -9,13 +9,12 @@ import socket
 import logging
 import multiprocessing
 from random import randint
-from collections import defaultdict
-from asyncore import dispatcher, dispatcher_with_send
+from asyncore import dispatcher
 
 from async import TCPClient
 from source import Socket
-from utils import Window, start_process
-from executor import Executor, Reduce, Iterator
+from utils import Window, start_process, endpoint
+from executor import Executor, Reduce, Iterator, Map
 
 
 __author__ = 'tong'
@@ -86,20 +85,14 @@ class Subscribe(Executor):
         raise Exception('please use `[]` to choose topic')
 
     def __getitem__(self, item):
-        class Unpack(Iterator):
-            def handle(self, _):
-                if 'history' in _:
-                    for filename in _['history']:
-                        with open(filename) as fp:
-                            yield fp.readline()
-                for data in _.get('data', []):
-                    yield data
+        class Receiver(Socket):
+            def initialize(self):
+                sock = super(Receiver, self).initialize()
+                sock.send('0{"topic": "%s"}\n' % item)
+                return sock
 
-        item += '\n'
-        s = Socket(self.address, lambda: item,
-                   lambda _: _.send('0'), json.loads,
-                   lambda x: not x.get('data'))
-        u = Unpack()
+        s = Receiver(self.address)
+        u = Map(lambda x: x)
         return s | u
 
 
@@ -116,7 +109,7 @@ class Sensor(TCPClient):
 
 
 class TCPServer(dispatcher):
-    def __init__(self, address, path, maxsize=1024*1024, listen_num=5):
+    def __init__(self, address, path, maxsize=1024*1024, listen_num=5, archive_size=1024*1024*1024):
         dispatcher.__init__(self)
         socket_af = socket.AF_UNIX if isinstance(address, basestring) else socket.AF_INET
         self.create_socket(socket_af, socket.SOCK_STREAM)
@@ -124,24 +117,33 @@ class TCPServer(dispatcher):
         self.bind(address)
         self.listen(listen_num)
         self.size = maxsize
+        self.archive_size = archive_size
         self.path = path
-        self.data = defaultdict(list)
-        self.publishers = defaultdict(dict)
+        self.data = {}
+        self.files = {}
 
-    def location(self):
-        for topic, item in self.data.items():
-            path = os.path.join(self.path, topic)
-            if not os.path.exists(path):
-                os.makedirs(path)
-                open(os.path.join(path, '0'), 'w').close()
-            filenum = max([int(_) for _ in os.listdir(path)])
-            filesize = os.path.getsize(os.path.join(path, str(filenum)))
-            if filesize + sys.getsizeof(item) > 1024 * 1024 * 1024:
-                fp = open(os.path.join(path, str(filenum + 1)), 'a')
-            else:
-                fp = open(os.path.join(path, str(filenum)), 'a')
-            fp.write('\n'.join(item)+'\n')
-        self.data.clear()
+    def location(self, topic):
+        filenum, fp = self.files[topic]
+        path = os.path.join(self.path, topic)
+        item = self.data[topic]
+        filesize = os.path.getsize(os.path.join(path, str(filenum)))
+        if filesize + sys.getsizeof(item) > self.archive_size:
+            fp.close()
+            fp = open(os.path.join(path, str(filenum + 1)), 'a')
+        fp.write('\n'.join(item) + '\n')
+        self.data[topic] = []
+
+    def topic(self, name):
+        if name in self.data:
+            return self.data[name]
+        self.data[name] = []
+        path = os.path.join(self.path, name)
+        if not os.path.exists(path):
+            os.makedirs(path)
+            open(os.path.join(path, '0'), 'w').close()
+        filenum = max([int(_) for _ in os.listdir(path)])
+        self.files[name] = (filenum, open(os.path.join(path, str(filenum)), 'a'))
+        return self.data[name]
 
     def handle_accept(self):
         pair = self.accept()
@@ -149,11 +151,15 @@ class TCPServer(dispatcher):
             sock, addr = pair
             htype = None
             logger.info('server connect to %s(%s), pid: %s' % (addr, sock.fileno(), os.getpid()))
+            counter = 0
             while not htype:
                 try:
                     htype = sock.recv(1)
                 except socket.error:
                     time.sleep(1)
+                    counter += 1
+                if counter > 5:
+                    break
             logger.info('server connect to %s(%s), type: %s' % (addr, sock.fileno(), htype))
             if htype == '1':
                 PutHandler(self, sock)
@@ -161,16 +167,6 @@ class TCPServer(dispatcher):
                 GetHandler(self, sock)
             else:
                 sock.close()
-
-    def items(self, topic):
-        path = os.path.join(self.path, topic)
-        if os.path.exists(path):
-            history = [os.path.join(self.path, str(_)) for _ in
-                       sorted([int(_) for _ in os.listdir(path)])]
-        else:
-            history = []
-        data = self.data[topic]
-        return {'data': data, 'history': history}
 
     def handle_error(self):
         logger.error('server socket %s error' % str(self.addr))
@@ -184,14 +180,14 @@ class TCPServer(dispatcher):
         self.close()
 
 
-class Handler(dispatcher_with_send):
+class Handler(dispatcher):
     def __init__(self, server, *args):
-        dispatcher_with_send.__init__(self, *args)
+        dispatcher.__init__(self, *args)
         self.server = server
         self.message = ''
 
-    def handle_error(self):
-        logger.error('server handler socket %s error' % str(self.addr))
+    def handle_error(self, e=None):
+        logger.error('server handler socket %s error: %s' % (str(self.addr), e))
         self.handle_close()
 
     def handle_expt(self):
@@ -219,34 +215,74 @@ class Handler(dispatcher_with_send):
         else:
             data, self.message = self.message.rsplit('\n', 1)
 
-        for item in data.split('\n'):
-            if item:
-                self.send(self.handle(item) + '\n')
+        try:
+            for item in data.split('\n'):
+                if item:
+                    self.send(self.handle(item) + '\n')
+        except Exception, e:
+            self.handle_error(e)
 
 
 class PutHandler(Handler):
     def handle(self, data):
         topic, data = data.split(',', 1)
-        self.server.data[topic].append(data)
-        if topic in self.server.publishers:
-            for key in self.server.publishers[topic]:
-                self.server.publishers[topic][key].append(data)
-        if sys.getsizeof(self.server.data) >= self.server.size:
-            self.server.location()
+        self.server.topic(topic).append(data)
+        if sys.getsizeof(self.server.data[topic]) >= self.server.size:
+            self.server.location(topic)
         return '200'
 
 
 class GetHandler(Handler):
-    def handle(self, data):
-        topic = data.strip()
-        if id(self) not in self.server.publishers[topic]:
-            self.server.publishers[topic][id(self)] = []
-            return json.dumps(self.server.items(topic))
-        items = self.server.publishers[topic][id(self)]
-        self.server.publishers[topic][id(self)] = []
-        return json.dumps({'data': items})
+    def __init__(self, server, *args):
+        Handler.__init__(self, server, *args)
+        self.topic = None
+        self.number = -1
+        self.blocksize = 0
+        self.offset = 0
+        self.fp = None
 
-    def handle_close(self):
-        for key in self.server.publishers:
-            self.server.publishers[key].pop(id(self), None)
-        Handler.handle_close(self)
+    def handle(self, data):
+        data = json.loads(data)
+        self.topic = data['topic']
+        if data.get('number'):
+            self.use(data['number'])
+        if data.get('offset'):
+            self.offset = data['offset']
+            self.fp.seek(self.offset)
+        return ''
+
+    def use(self, number):
+        self.number = number
+        filename = os.path.join(self.server.path, self.topic, str(self.number))
+        if self.fp:
+            self.fp.close()
+        self.fp = open(filename)
+        self.blocksize = os.path.getsize(filename)
+        self.offset = 0
+
+    def handle_write(self):
+        from sendfile import sendfile
+        self.offset += sendfile(self.socket.fileno(), self.fp.fileno(), self.offset, self.blocksize)
+
+    def writable(self):
+        if not self.topic:
+            return False
+        if self.fp and self.blocksize > self.offset:
+            return True
+        if self.fp:
+            self.blocksize = endpoint(self.fp)
+            if self.blocksize > self.offset:
+                return True
+
+        pathname = os.path.join(self.server.path, str(self.topic))
+        if os.path.exists(pathname):
+            nums = sorted([int(_) for _ in os.listdir(pathname) if int(_) > self.number])
+        else:
+            nums = []
+
+        if nums:
+            self.use(nums[0])
+            return True
+        if self.topic in self.server.data and self.server.data[self.topic]:
+            self.server.location(self.topic)
+        return False

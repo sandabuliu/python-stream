@@ -25,8 +25,7 @@ python setup.py install
 ### TodoList
 
 * 订阅器(Subscribe)客户端超时处理
-* 优化订阅器(Subscribe)存取机制
-* 多主机并行计算
+* 并行计算
 * TCP 异步源
 * HTTP 异步输出/异步源
 * 添加其他基础输出/基础源

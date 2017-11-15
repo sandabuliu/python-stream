@@ -14,14 +14,24 @@ def start_process(func):
     return proc
 
 
+def endpoint(fp):
+    pos = fp.tell()
+    fp.seek(0, 2)
+    end = fp.tell()
+    fp.seek(pos)
+    return end
+
+
 class Window(object):
     def __init__(self, size=None, timeout=None):
         self.size = size
         self.timer = time.time()
         self.buffer = []
         self.timeout = timeout
-        if not self.timeout and not self.size:
-            self.timeout = 2
+
+    @property
+    def empty(self):
+        return not bool(self.buffer)
 
     @property
     def data(self):
@@ -36,6 +46,8 @@ class Window(object):
 
     @property
     def fulled(self):
+        if not self.size and not self.timeout:
+            return False
         if not self.buffer:
             return False
         if self.size:
