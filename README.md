@@ -29,5 +29,6 @@ python setup.py install
 * TCP 异步源
 * HTTP 异步输出/异步源
 * 添加其他基础输出/基础源
+* 添加对其他常用模块的支持, 如 redis, kafka, flume, log-stash, 各种数据库等
 
 Copyright © 2017 [g_tongbin@foxmail.com](mailto:g_tongbin@foxmail.com)
