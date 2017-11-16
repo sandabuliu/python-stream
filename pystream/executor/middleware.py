@@ -14,7 +14,7 @@ from asyncore import dispatcher
 from async import TCPClient
 from source import Socket
 from utils import Window, start_process, endpoint
-from executor import Executor, Reduce, Iterator, Map
+from executor import Executor, Group, Iterator, Map
 
 
 __author__ = 'tong'
@@ -43,7 +43,7 @@ class Queue(Executor):
         import source
         pipe = multiprocessing.Queue(self.qsize)
         sc = super(Queue, self).source
-        rc = Reduce(lambda x: x, window=Window(self.batch, self.timeout))
+        rc = Group(window=Window(self.batch, self.timeout))
         p = multiprocessing.Process(target=self.run, args=(sc | rc, pipe.put))
         p.daemon = True
         p.start()
@@ -127,7 +127,7 @@ class TCPServer(dispatcher):
         path = os.path.join(self.path, topic)
         item = self.data[topic]
         filesize = os.path.getsize(os.path.join(path, str(filenum)))
-        if filesize + sys.getsizeof(item) > self.archive_size:
+        if filesize + sum([len(_) for _ in item]) > self.archive_size:
             fp.close()
             fp = open(os.path.join(path, str(filenum + 1)), 'a')
         fp.write('\n'.join(item) + '\n')
