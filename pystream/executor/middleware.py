@@ -14,7 +14,7 @@ from asyncore import dispatcher
 from async import TCPClient
 from source import Socket
 from utils import Window, start_process, endpoint
-from executor import Executor, Group, Iterator, Map
+from executor import Executor, Group, Iterator
 
 
 __author__ = 'tong'
@@ -51,18 +51,20 @@ class Queue(Executor):
 
 
 class Subscribe(Executor):
-    def __init__(self, address=None, cache_path=None, maxsize=1024*1024, listen_num=5, **kwargs):
+    def __init__(self, address=None, cache_path=None, maxsize=1024*1024,
+                 listen_num=5, archive_size=1024*1024*1024, **kwargs):
         self.mutex = multiprocessing.Lock()
         self.sensor = None
         self.server = None
         self.maxsize = maxsize
         self.listen_num = listen_num
+        self.archive_size = archive_size or 1024*1024*1024
         self.cache_path = cache_path or '/tmp/pystream_data_%s' % time.time()
         if hasattr(socket, 'AF_UNIX'):
             self.address = address or '/tmp/pystream_sock_%s' % time.time()
         else:
             self.address = address or ('127.0.0.1', randint(20000, 50000))
-        if os.path.exists(self.cache_path):
+        if not os.path.exists(self.cache_path):
             os.mkdir(self.cache_path)
         super(Subscribe, self).__init__(**kwargs)
 
@@ -78,21 +80,38 @@ class Subscribe(Executor):
         import asyncore
         if self._source and not self.sensor:
             self.sensor = start_process(self.init_sensor)
-        TCPServer(self.address, self.cache_path, self.maxsize, self.listen_num)
+        TCPServer(self.address, self.cache_path, self.maxsize, self.listen_num, self.archive_size)
         asyncore.loop()
 
     def __iter__(self):
         raise Exception('please use `[]` to choose topic')
 
-    def __getitem__(self, item):
+    def __getitem__(self, name):
         class Receiver(Socket):
             def initialize(self):
                 sock = super(Receiver, self).initialize()
-                sock.send('0{"topic": "%s"}\n' % item)
+                if isinstance(name, basestring):
+                    sock.send('0{"topic": "%s"}\n' % name)
+                elif len(name) == 2:
+                    sock.send('0{"topic": "%s", "number": %s}\n' % name)
+                else:
+                    sock.send('0{"topic": "%s", "number": %s, "offset": %s}\n' % name)
                 return sock
 
+        class Mapper(Executor):
+            def __init__(self, **kwargs):
+                super(Mapper, self).__init__(**kwargs)
+                self.file = None
+                self.position = None
+
+            def handle(self, item):
+                if not item:
+                    return None
+                self.file, self.position, item = item.split('#', 2)
+                return item
+
         s = Receiver(self.address)
-        u = Map(lambda x: x)
+        u = Mapper()
         return s | u
 
 
@@ -125,12 +144,15 @@ class TCPServer(dispatcher):
     def location(self, topic):
         filenum, fp = self.files[topic]
         path = os.path.join(self.path, topic)
-        item = self.data[topic]
+        items = self.data[topic]
         filesize = os.path.getsize(os.path.join(path, str(filenum)))
-        if filesize + sum([len(_) for _ in item]) > self.archive_size:
+        if filesize + sum([len(_) for _ in items]) > self.archive_size:
             fp.close()
-            fp = open(os.path.join(path, str(filenum + 1)), 'a')
-        fp.write('\n'.join(item) + '\n')
+            fp = open(os.path.join(path, str(filenum+1)), 'a')
+            self.files[topic] = [filenum+1, fp]
+        for item in items:
+            pos = fp.tell()
+            fp.write('%s#%s#%s\n' % (filenum, pos, item))
         self.data[topic] = []
 
     def topic(self, name):
@@ -154,6 +176,7 @@ class TCPServer(dispatcher):
             counter = 0
             while not htype:
                 try:
+                    sock.send('\n')
                     htype = sock.recv(1)
                 except socket.error:
                     time.sleep(1)
@@ -247,12 +270,12 @@ class GetHandler(Handler):
         if data.get('number'):
             self.use(data['number'])
         if data.get('offset'):
-            self.offset = data['offset']
+            self.offset = int(data['offset'])
             self.fp.seek(self.offset)
         return ''
 
     def use(self, number):
-        self.number = number
+        self.number = int(number)
         filename = os.path.join(self.server.path, self.topic, str(self.number))
         if self.fp:
             self.fp.close()
