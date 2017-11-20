@@ -322,6 +322,19 @@ class Memory(Executor):
             yield item
 
 
+class Faker(Executor):
+    def __init__(self, function, maxsize=None, **kwargs):
+        super(Faker, self).__init__(**kwargs)
+        self.func = function
+        self.maxsize = maxsize
+
+    def __iter__(self):
+        i = 0
+        while not self.maxsize or i < self.maxsize:
+            yield self.func()
+            i += 1
+
+
 class Queue(Executor):
     def __init__(self, queue, EOF=None, wait=None, **kwargs):
         super(Queue, self).__init__(**kwargs)
