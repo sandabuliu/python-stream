@@ -83,6 +83,13 @@ class Subscribe(Executor):
         TCPServer(self.address, self.cache_path, self.maxsize, self.listen_num, self.archive_size)
         asyncore.loop()
 
+    def status(self, topic):
+        return self._get('topic %s' % topic)
+
+    @property
+    def topics(self):
+        return self._get('topics')
+
     def __iter__(self):
         raise Exception('please use `[]` to choose topic')
 
@@ -113,6 +120,20 @@ class Subscribe(Executor):
         s = Receiver(self.address)
         u = Mapper()
         return s | u
+
+    def _get(self, text):
+        socket_af = socket.AF_UNIX if isinstance(self.address, basestring) else socket.AF_INET
+        sock = socket.socket(socket_af, socket.SOCK_STREAM)
+        sock.connect(self.address)
+        sock.send('2%s\n' % text.strip())
+        fp = sock.makefile('r')
+        res = fp.readline().strip()
+        while not res:
+            res = fp.readline().strip()
+        sock.close()
+        if res:
+            return json.loads(res)
+        return None
 
 
 class Sensor(TCPClient):
@@ -188,6 +209,10 @@ class TCPServer(dispatcher):
                 PutHandler(self, sock)
             elif htype == '0':
                 GetHandler(self, sock)
+            elif htype == '1':
+                PutHandler(self, sock)
+            elif htype == '2':
+                StaHandler(self, sock)
             else:
                 sock.close()
 
@@ -253,6 +278,29 @@ class PutHandler(Handler):
         if sys.getsizeof(self.server.data[topic]) >= self.server.size:
             self.server.location(topic)
         return '200'
+
+
+class StaHandler(Handler):
+    def handle(self, data):
+        data = data.strip().lower()
+        if data == 'topics':
+            keys = self.server.data.keys()
+            if os.path.exists(self.server.path):
+                keys += os.listdir(self.server.path)
+            return json.dumps(list(set(keys)))
+        if data.startswith('topic '):
+            name = data[6:]
+            ret = {}
+            if os.path.exists(self.server.path):
+                filepath = os.path.join(self.server.path, name)
+                if os.path.exists(filepath):
+                    files = os.listdir(filepath)
+                    ret['filenum'] = len(files)
+                    ret['filesize'] = sum([os.path.getsize(os.path.join(filepath, _)) for _ in files])
+                items = self.server.data.get(name, [])
+                ret['memsize'] = sum([len(_) for _ in items])
+            return json.dumps(ret)
+        return 'null'
 
 
 class GetHandler(Handler):
