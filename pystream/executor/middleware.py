@@ -47,7 +47,9 @@ class Queue(Executor):
         p = multiprocessing.Process(target=self.run, args=(sc | rc, pipe.put))
         p.daemon = True
         p.start()
-        return source.Queue(pipe, EOF=self.EOF) | Iterator()
+        iterator = Iterator()
+        iterator._output = self._output
+        return source.Queue(pipe, EOF=self.EOF) | iterator
 
 
 class Subscribe(Executor):
