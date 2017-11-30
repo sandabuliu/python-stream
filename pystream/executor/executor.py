@@ -251,22 +251,22 @@ class Group(Executor):
 
 class JsonDumps(Executor):
     def handle(self, item):
-        return json.dumps(item, cls=JSONCls)
+        return json.dumps(item, **self.kwargs)
 
 
 class JsonLoads(Executor):
     def handle(self, item):
-        return json.loads(item)
+        return json.loads(item, **self.kwargs)
 
 
 class MsgpackDumps(Executor):
     def handle(self, item):
-        return msgpack.dumps(item)
+        return msgpack.dumps(item, **self.kwargs)
 
 
 class MsgpackLoads(Executor):
     def handle(self, item):
-        return msgpack.loads(item)
+        return msgpack.loads(item, **self.kwargs)
 
 
 class GZip(Executor):
