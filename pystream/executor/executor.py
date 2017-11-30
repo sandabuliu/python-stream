@@ -168,7 +168,8 @@ class Sort(Executor):
             else:
                 r = m - 1
         self.items.insert((l + r)/2+1, item)
-        self.length += len(item)
+        if self.maxsize:
+            self.length += len(item)
 
     class Iterable(object):
         def __init__(self, exe):
@@ -176,6 +177,10 @@ class Sort(Executor):
             self.func = max if exe.desc else min
 
         def __iter__(self):
+            if not self.exe.maxsize:
+                for item in self.exe.items:
+                    yield item
+                return
             fps = [iter(self.exe.items)] if self.exe.items else []
             fps += [open(_) for _ in self.exe.files]
             fps = [[_, next(_).strip('\n')] for _ in fps]
