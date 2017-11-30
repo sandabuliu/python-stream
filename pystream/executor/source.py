@@ -217,21 +217,15 @@ class File(Executor):
 
 
 class Csv(File):
-    def __init__(self, path, filewait=None, confirmwait=None, cachefile=None, **kwargs):
-        super(Csv, self).__init__(path, filewait, confirmwait, cachefile, **kwargs)
-        self.kwargs = kwargs
-        self.data = None
-
-    def write(self, data):
-        self.data = data
+    def __init__(self, path, filewait=None, confirmwait=None, cachefile=None, name=None, ignore_exc=True, **kwargs):
+        super(Csv, self).__init__(path, filewait, confirmwait, cachefile,
+                                  name=name, ignore_exc=ignore_exc, **kwargs)
 
     def fetch(self, fp):
         reader = csv.reader(fp, **self.kwargs)
-        writer = csv.writer(self, **self.kwargs)
         for line in reader:
             self.lineno += 1
-            writer.writerow(line)
-            yield self.data
+            yield line
 
 
 class Socket(Executor):
@@ -354,3 +348,18 @@ class Queue(Executor):
                 timer = time.time()
                 yield Event.IDLE
                 sleep(self.wait - (time.time() - timer))
+
+
+class SQL(Executor):
+    def __init__(self, conn, sql, batch=10000, **kwargs):
+        super(SQL, self).__init__(**kwargs)
+        self.conn = conn
+        self.sql = sql
+        self.batch = batch
+
+    def __iter__(self):
+        cursor = self.conn.execute(self.sql)
+        items = cursor.fetchmany(self.batch)
+        if items:
+            for item in items:
+                yield item
