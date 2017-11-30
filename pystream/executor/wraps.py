@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import logging
+import traceback
+
 from output import Output
 from executor import Executor
 from utils import start_process
@@ -8,6 +11,8 @@ from event import Event, is_event
 
 
 __author__ = 'tong'
+
+logger = logging.getLogger('stream.logger')
 
 
 class Wraps(Executor):
@@ -22,8 +27,12 @@ class Batch(Wraps):
         self.sender = sender
         super(Batch, self).__init__(**kwargs)
 
-    def output(self, item):
-        self.sender.outputmany(item)
+    def handle(self, item):
+        try:
+            self.sender.outputmany(item)
+        except Exception, e:
+            logger.error('OUTPUT %s %s error: %s' % (self.__class__.__name__, self.name, e))
+            return {'data': item, 'exception': e, 'traceback': traceback.format_exc()}
 
 
 class Combiner(Wraps):
