@@ -78,12 +78,14 @@ class HTTPRequest(Output):
 
     def output(self, item):
         import requests
+        ret = requests.request(self.method, self.server, headers=self.headers, **self.params(item))
+        logger.info('OUTPUT INSERT Request 1: %s' % ret)
+
+    def params(self, item):
         if self.method == 'GET':
-            ret = requests.get(self.server, params=item, headers=self.headers)
-            logger.info('OUTPUT INSERT Request 1: %s' % ret)
-        elif self.method == 'POST':
-            ret = requests.post(self.server, data=self.data(item), headers=self.headers)
-            logger.info('OUTPUT INSERT Request 1: %s' % ret)
+            return {'params': item}
+        if self.method == 'POST':
+            return {'data': self.data(item)}
 
     def data(self, data):
         ctype = self.headers.get('Content-Type')
@@ -92,9 +94,41 @@ class HTTPRequest(Output):
         return data
 
 
+class File(Output):
+    def __init__(self, filename, **kwargs):
+        self.filename = filename
+        self.stream = open(self.filename, 'a')
+        super(File, self).__init__(**kwargs)
+
+    def __del__(self):
+        self.stream.close()
+
+    def output(self, item):
+        self.stream.write(item+'\n')
+
+    def outputmany(self, items):
+        self.stream.writelines('\n'.join(items)+'\n')
+
+
+class Csv(File):
+    def __init__(self, filename, name=None, ignore_exc=True, **kwargs):
+        import csv
+        super(Csv, self).__init__(filename, name=name, ignore_exc=ignore_exc, **kwargs)
+        self.writer = csv.writer(self.stream, **kwargs)
+
+    def output(self, item):
+        self.writer.writerow(item)
+
+    def outputmany(self, items):
+        self.writer.writerows(items)
+
+
 class Screen(Output):
     def output(self, item):
         print item
+
+    def outputmany(self, items):
+        print '\n'.join(items)+'\n'
 
 
 class Null(Output):
