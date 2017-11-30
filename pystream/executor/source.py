@@ -360,6 +360,6 @@ class SQL(Executor):
     def __iter__(self):
         cursor = self.conn.execute(self.sql)
         items = cursor.fetchmany(self.batch)
-        if items:
-            for item in items:
-                yield item
+        while items:
+            yield items
+            items = cursor.fetchmany(self.batch)
