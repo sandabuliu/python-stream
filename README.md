@@ -26,7 +26,6 @@ python setup.py install
 
 * 订阅器(Subscribe)客户端超时处理
 * 并行计算
-* TCP 异步源
 * HTTP 异步输出/异步源
 * 添加其他基础输出/基础源
 * 添加对其他常用模块的支持, 如 redis, kafka, flume, log-stash, 各种数据库等

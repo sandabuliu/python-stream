@@ -68,18 +68,32 @@ class Kafka(Output):
 
 
 class HTTPRequest(Output):
-    def __init__(self, server, headers=None, method='GET', **kwargs):
+    def __init__(self, server, headers=None, method='GET', timeout=None, **kwargs):
         from .. import __version__
         self.server = server
         self.method = method.upper()
         self.headers = headers or {}
+        self.timeout = timeout
         self.headers.setdefault('User-Agent', 'python-stream %s HTTPRequest' % __version__)
         super(HTTPRequest, self).__init__(**kwargs)
 
     def output(self, item):
         import requests
-        ret = requests.request(self.method, self.server, headers=self.headers, **self.params(item))
+        timeout = (self.timeout, self.timeout) if self.timeout else None
+        ret = requests.request(self.method, self.server, headers=self.headers,
+                               timeout=timeout, **self.params(item))
         logger.info('OUTPUT INSERT Request 1: %s' % ret)
+
+    def outputmany(self, items):
+        import grequests
+        tasks = [grequests.request(
+            self.method, self.server, headers=self.headers, **self.params(item)
+        ) for item in items]
+        ret = grequests.map(tasks, gtimeout=self.timeout)
+        if all(ret):
+            logger.info('OUTPUT INSERT Request %s' % len(ret))
+            return
+        raise Exception([tasks[i].exception if _ is None else _ for i, _ in enumerate(ret)])
 
     def params(self, item):
         if self.method == 'GET':
