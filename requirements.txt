@@ -3,6 +3,7 @@ python-dateutil>=2.5.3
 psutil>=4.3.0
 multiprocess>=0.70.5
 pytz
+toolz
 
 # posix
 pybloomfiltermmap>=0.3.15

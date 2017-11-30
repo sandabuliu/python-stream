@@ -42,7 +42,7 @@ LICENSE = ''
 PACKAGES = find_packages(exclude=['tests', 'tests.*'])
 PACKAGE_DATA = {'pystream': ['rule']}
 
-INSTALL_REQUIRES = ['pyparsing>=2.1.5', 'pytz', 'python-dateutil>=2.5.3', 'psutil>=4.3.0', 'pybloom>=1.1']
+INSTALL_REQUIRES = ['pyparsing>=2.1.5', 'pytz', 'python-dateutil>=2.5.3', 'psutil>=4.3.0', 'pybloom>=1.1', 'toolz']
 
 if not WINDOWS:
     INSTALL_REQUIRES.append('pybloomfiltermmap>=0.3.15')
