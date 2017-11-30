@@ -4,6 +4,8 @@
 import json
 import logging
 import traceback
+
+from toolz import merge
 from executor import Executor
 
 
@@ -68,12 +70,13 @@ class Kafka(Output):
 
 
 class HTTPRequest(Output):
-    def __init__(self, server, headers=None, method='GET', timeout=None, **kwargs):
+    def __init__(self, server, headers=None, method='GET', request_args=None, timeout=None, **kwargs):
         from .. import __version__
         self.server = server
         self.method = method.upper()
         self.headers = headers or {}
         self.timeout = timeout
+        self.request_args = request_args or {}
         self.headers.setdefault('User-Agent', 'python-stream %s HTTPRequest' % __version__)
         super(HTTPRequest, self).__init__(**kwargs)
 
@@ -81,13 +84,15 @@ class HTTPRequest(Output):
         import requests
         timeout = (self.timeout, self.timeout) if self.timeout else None
         ret = requests.request(self.method, self.server, headers=self.headers,
-                               timeout=timeout, **self.params(item))
+                               timeout=timeout, **merge(self.arguments(item), self.request_args))
+        if not ret:
+            raise Exception(ret)
         logger.info('OUTPUT INSERT Request 1: %s' % ret)
 
     def outputmany(self, items):
         import grequests
         tasks = [grequests.request(
-            self.method, self.server, headers=self.headers, **self.params(item)
+            self.method, self.server, headers=self.headers, **self.arguments(item)
         ) for item in items]
         ret = grequests.map(tasks, gtimeout=self.timeout)
         if all(ret):
@@ -95,7 +100,7 @@ class HTTPRequest(Output):
             return
         raise Exception([tasks[i].exception if _ is None else _ for i, _ in enumerate(ret)])
 
-    def params(self, item):
+    def arguments(self, item):
         if self.method == 'GET':
             return {'params': item}
         if self.method == 'POST':
