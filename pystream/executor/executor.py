@@ -138,7 +138,6 @@ class Sort(Executor):
 
     def handle(self, item):
         self.insert(item)
-        print self.length
         if self.maxlen:
             if len(self.items) > self.maxlen:
                 self.items = self.items[:self.maxlen]
