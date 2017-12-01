@@ -10,7 +10,7 @@ import logging
 from .event import Event, is_event
 from .utils import Window, gzip, ungzip
 from ..logic import Key, Or, And
-from ..utils import DefaultParser, JSONCls
+from ..utils import DefaultParser
 from ..logparser.logparser import LogParser
 
 __author__ = 'tong'

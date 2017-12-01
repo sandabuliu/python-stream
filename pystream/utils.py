@@ -26,8 +26,7 @@ class JSONCls(json.JSONEncoder):
             return '%04d-%02d-%02d' % (obj.year, obj.month, obj.day)
         if isinstance(obj, time):
             return obj.strftime('%H:%M:%S')
-        else:
-            return json.JSONEncoder.default(self, obj)
+        return json.JSONEncoder.default(self, obj)
 
 
 class DefaultParser(object):
