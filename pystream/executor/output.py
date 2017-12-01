@@ -124,9 +124,11 @@ class File(Output):
 
     def output(self, item):
         self.stream.write(item+'\n')
+        self.stream.flush()
 
     def outputmany(self, items):
         self.stream.writelines('\n'.join(items)+'\n')
+        self.stream.flush()
 
 
 class Csv(File):
