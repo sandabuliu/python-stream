@@ -8,6 +8,8 @@ import traceback
 from toolz import merge
 from executor import Executor
 
+from utils import IterableError
+
 
 __author__ = 'tong'
 
@@ -70,13 +72,15 @@ class Kafka(Output):
 
 
 class HTTPRequest(Output):
-    def __init__(self, server, headers=None, method='GET', request_args=None, timeout=None, **kwargs):
+    def __init__(self, server, headers=None, method='GET', request_args=None, timeout=None,
+                 catch_exc=None, **kwargs):
         from .. import __version__
         self.server = server
         self.method = method.upper()
         self.headers = headers or {}
         self.timeout = timeout
         self.request_args = request_args or {}
+        self.catch_exc = catch_exc or (lambda x: not bool(x))
         self.headers.setdefault('User-Agent', 'python-stream %s HTTPRequest' % __version__)
         super(HTTPRequest, self).__init__(**kwargs)
 
@@ -85,7 +89,7 @@ class HTTPRequest(Output):
         timeout = (self.timeout, self.timeout) if self.timeout else None
         ret = requests.request(self.method, self.server, headers=self.headers,
                                timeout=timeout, **merge(self.arguments(item), self.request_args))
-        if not ret:
+        if self.catch_exc(ret):
             raise Exception(ret)
         logger.info('OUTPUT INSERT Request 1: %s' % ret)
 
@@ -95,10 +99,16 @@ class HTTPRequest(Output):
             self.method, self.server, headers=self.headers, **self.arguments(item)
         ) for item in items]
         ret = grequests.map(tasks, gtimeout=self.timeout)
-        if all(ret):
+        if not any([self.catch_exc(_) for _ in ret]):
             logger.info('OUTPUT INSERT Request %s' % len(ret))
             return
-        raise Exception([tasks[i].exception if _ is None else _ for i, _ in enumerate(ret)])
+        errors = []
+        for i, _ in enumerate(ret):
+            if _ is None:
+                errors.append({'data': items[i], 'exception': tasks[i].exception, 'traceback': tasks[i].traceback})
+            elif self.catch_exc(_):
+                errors.append({'data': items[i], 'exception': Exception(_), 'traceback': None})
+        raise IterableError(*errors)
 
     def arguments(self, item):
         if self.method == 'GET':

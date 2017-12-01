@@ -6,8 +6,8 @@ import traceback
 
 from output import Output
 from executor import Executor
-from utils import start_process
 from event import Event, is_event
+from utils import start_process, IterableError
 
 
 __author__ = 'tong'
@@ -27,12 +27,22 @@ class Batch(Wraps):
         self.sender = sender
         super(Batch, self).__init__(**kwargs)
 
+    def __iter__(self):
+        iterator = super(Batch, self).__iter__()
+        for items in iterator:
+            if is_event(items) and self._output:
+                yield items
+                continue
+            for item in items:
+                yield item
+
     def handle(self, item):
         try:
             self.sender.outputmany(item)
+        except IterableError, e:
+            return [_ for _ in e.args]
         except Exception, e:
-            logger.error('OUTPUT %s %s error: %s' % (self.__class__.__name__, self.name, e))
-            return {'data': item, 'exception': e, 'traceback': traceback.format_exc()}
+            return [{'data': _, 'exception': e, 'traceback': traceback.format_exc()} for _ in item]
 
 
 class Combiner(Wraps):

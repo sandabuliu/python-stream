@@ -85,6 +85,10 @@ def ungzip(item):
     return s.getvalue()
 
 
+class IterableError(Exception):
+    pass
+
+
 class BloomFilter(object):
     def __init__(self, cachefile, capacity=1000000, error_rate=0.001):
         self.cachefile = cachefile
