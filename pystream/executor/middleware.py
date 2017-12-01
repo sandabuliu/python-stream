@@ -12,7 +12,6 @@ from random import randint
 from asyncore import dispatcher
 
 from async import TCPClient
-from source import Socket
 from utils import Window, start_process, endpoint
 from executor import Executor, Group, Iterator
 
@@ -96,7 +95,9 @@ class Subscribe(Executor):
         raise Exception('please use `[]` to choose topic')
 
     def __getitem__(self, name):
-        class Receiver(Socket):
+        import source
+
+        class Receiver(source.TCPClient):
             def initialize(self):
                 sock = super(Receiver, self).initialize()
                 if isinstance(name, basestring):

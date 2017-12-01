@@ -228,9 +228,9 @@ class Csv(File):
             yield line
 
 
-class Socket(Executor):
+class TCPClient(Executor):
     def __init__(self, address, **kwargs):
-        super(Socket, self).__init__(**kwargs)
+        super(TCPClient, self).__init__(**kwargs)
         self.address = address
 
     def initialize(self):
