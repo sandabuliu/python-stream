@@ -176,7 +176,7 @@ class TCPServer(dispatcher):
             self.files[topic] = [filenum+1, fp]
         for item in items:
             pos = fp.tell()
-            fp.write('%s#%s#%s\n' % (filenum, pos, item))
+            fp.write('%s#%s#%s\n' % (self.files[topic][0], pos, item))
         self.data[topic] = []
 
     def topic(self, name):
