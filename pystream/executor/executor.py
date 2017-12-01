@@ -303,22 +303,10 @@ class Iterator(Executor):
         self.func = function or (lambda x: x)
 
     def __iter__(self):
-        for item in self.source:
-            try:
-                if is_event(item):
-                    if item == Event.SKIP:
-                        continue
-                    result = self.handle_event(item)
-                    if result is not None:
-                        yield self.func(result)
-                    if self._output:
-                        yield item
-                    continue
-
-                for result in self.handle(item):
-                    yield self.func(result)
-            except BaseException, e:
-                if self.ignore_exc:
-                    self.handle_exception(item, e)
-                else:
-                    raise
+        iterator = super(Iterator, self).__iter__()
+        for items in iterator:
+            if is_event(items) and self._output:
+                yield items
+                continue
+            for item in items:
+                yield self.func(item)
