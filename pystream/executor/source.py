@@ -268,7 +268,7 @@ class TCPClient(Executor):
         message = ''
         while True:
             data = self.read(sock)
-            if data is None:
+            if data is None and not message:
                 break
             if is_event(data):
                 yield data
