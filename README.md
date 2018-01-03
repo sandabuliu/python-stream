@@ -134,12 +134,11 @@ for item in s:
 from sqlalchemy import create_engine
 from pystream.executor.source import SQL
 from pystream.executor.output import Csv
-from pystream.executor.executor import Group
 from pystream.executor.wraps import Batch
 
 engine = create_engine('mysql://root:123456@127.0.0.1:3306/test')  
 conn = engine.connect()
-s = SQL(conn, 'select * from test limit 10') | Group(lambda x: sum(x, []), size=2) | Batch(Csv('/tmp/output'))
+s = SQL(conn, 'select * from faker') | Batch(Csv('/tmp/output'))
 
 for item in s:
     print item['data']
