@@ -208,9 +208,7 @@ class TCPServer(dispatcher):
                 if counter > 5:
                     break
             logger.info('server connect to %s(%s), type: %s' % (addr, sock.fileno(), htype))
-            if htype == '1':
-                PutHandler(self, sock)
-            elif htype == '0':
+            if htype == '0':
                 GetHandler(self, sock)
             elif htype == '1':
                 PutHandler(self, sock)
