@@ -87,6 +87,9 @@ class Subscribe(Executor):
     def status(self, topic):
         return self._get('topic %s' % topic)
 
+    def stop(self):
+        return self._get('stop')
+
     @property
     def topics(self):
         return self._get('topics')
@@ -282,25 +285,42 @@ class PutHandler(Handler):
 
 
 class StaHandler(Handler):
+    def topics(self):
+        keys = self.server.data.keys()
+        if os.path.exists(self.server.path):
+            keys += os.listdir(self.server.path)
+        return json.dumps(list(set(keys)))
+
+    def status(self, name):
+        ret = {}
+        if os.path.exists(self.server.path):
+            filepath = os.path.join(self.server.path, name)
+            if os.path.exists(filepath):
+                files = os.listdir(filepath)
+                ret['filenum'] = len(files)
+                ret['filesize'] = sum([os.path.getsize(os.path.join(filepath, _)) for _ in files])
+            items = self.server.data.get(name, [])
+            ret['memsize'] = sum([len(_) for _ in items])
+        return json.dumps(ret)
+
+    def stop(self):
+        for name in self.server.data:
+            self.server.location(name)
+        self.server.close()
+        for handler in self._map.values():
+            if isinstance(handler, PutHandler):
+                handler.close()
+        return 'true'
+
     def handle(self, data):
         data = data.strip().lower()
         if data == 'topics':
-            keys = self.server.data.keys()
-            if os.path.exists(self.server.path):
-                keys += os.listdir(self.server.path)
-            return json.dumps(list(set(keys)))
+            return self.topics()
         if data.startswith('topic '):
             name = data[6:]
-            ret = {}
-            if os.path.exists(self.server.path):
-                filepath = os.path.join(self.server.path, name)
-                if os.path.exists(filepath):
-                    files = os.listdir(filepath)
-                    ret['filenum'] = len(files)
-                    ret['filesize'] = sum([os.path.getsize(os.path.join(filepath, _)) for _ in files])
-                items = self.server.data.get(name, [])
-                ret['memsize'] = sum([len(_) for _ in items])
-            return json.dumps(ret)
+            return self.status(name)
+        if data == 'stop':
+            return self.stop()
         return 'null'
 
 
