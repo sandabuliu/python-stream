@@ -37,8 +37,12 @@ class TCPClient(dispatcher):
         self.close()
 
     def writable(self):
-        self.message = next(self.iterator)
-        return not is_event(self.message)
+        try:
+            self.message = next(self.iterator)
+            return not is_event(self.message)
+        except StopIteration:
+            self.handle_close()
+            return False
 
     def handle_write(self):
         sent = self.send(self.message+'\n')
