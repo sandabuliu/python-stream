@@ -70,8 +70,11 @@ class Subscribe(Executor):
         super(Subscribe, self).__init__(**kwargs)
 
     def init_sensor(self):
-        server = self._source | self.producer
-        server.start()
+        try:
+            server = self._source | self.producer
+            server.start()
+        except Exception, e:
+            logger.error('sensor error: %s' % e)
 
     @property
     def producer(self):
@@ -173,6 +176,7 @@ class TCPServer(dispatcher):
         path = os.path.join(self.path, topic)
         items = self.data[topic]
         filesize = os.path.getsize(os.path.join(path, str(filenum)))
+        size = 0
         if filesize + sum([len(_) for _ in items]) > self.archive_size:
             fp.close()
             fp = open(os.path.join(path, str(filenum+1)), 'a')
@@ -180,7 +184,9 @@ class TCPServer(dispatcher):
         for item in items:
             pos = fp.tell()
             fp.write('%s#%s#%s\n' % (self.files[topic][0], pos, item))
+            size += fp.tell() - pos
         self.data[topic] = []
+        logger.info('SUBSCRIBE topic [%s] location %s successfully' % (topic, size))
 
     def topic(self, name):
         if name in self.data:
