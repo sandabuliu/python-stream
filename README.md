@@ -208,6 +208,35 @@ from pystream.executor.output import Kafka
 Kafka('topic', '127.0.0.1:9092')
 ```
 
+#### 中间件
+##### 队列
+```python
+from pystream.executor.source import Tail
+from pystream.executor.output import Stdout
+from pystream.executor.middleware import Queue
+
+s = Tail('/Users/tongbin01/PycharmProjects/python-stream/README.md') | Queue() | Stdout()
+s.start()
+```
+
+##### 订阅
+
+```python
+from random import randint
+from pystream.executor.source import Tail
+from pystream.executor.executor import Map
+from pystream.executor.output import Stdout
+
+from pystream.executor.middleware import Subscribe
+from pystream.executor.wraps import Daemonic
+
+sub = Tail('/var/log/messages') | Map(lambda x: (str(randint(1, 2)), x.strip())) | Subscribe()
+Daemonic(sub).start()
+
+s = sub['1'] | Map(lambda x: x.strip()) | Stdout()
+s.start()
+```
+
 ### TodoList
 
 * 订阅器(Subscribe)客户端超时处理
