@@ -235,11 +235,16 @@ class TCPClient(Executor):
 
     def initialize(self):
         import socket
-        socket_af = socket.AF_UNIX if isinstance(self.address, basestring) else socket.AF_INET
-        sock = socket.socket(socket_af, socket.SOCK_STREAM)
-        sock.connect(self.address)
-        sock.setblocking(False)
-        return sock
+        for _ in range(3):
+            try:
+                socket_af = socket.AF_UNIX if isinstance(self.address, basestring) else socket.AF_INET
+                sock = socket.socket(socket_af, socket.SOCK_STREAM)
+                sock.connect(self.address)
+                sock.setblocking(False)
+                return sock
+            except socket.error:
+                time.sleep(0.5)
+        raise socket.error
 
     def read(self, sock):
         import socket
