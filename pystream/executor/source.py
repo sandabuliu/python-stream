@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import sys
 import csv
 import time
 import glob
@@ -214,6 +215,16 @@ class File(Executor):
                     self.stream.close()
                 self.filter.add(filename)
                 logger.info('SOURCE FILE dumping %s End %s' % (filename, self.lineno))
+
+
+class Stdin(Executor):
+    def __iter__(self):
+        while True:
+            try:
+                line = sys.stdin.readline().strip()
+                yield line
+            except KeyboardInterrupt:
+                break
 
 
 class Csv(File):

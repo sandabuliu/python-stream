@@ -162,5 +162,8 @@ class Screen(Output):
         print '\n'.join(items)+'\n'
 
 
+Stdout = Screen
+
+
 class Null(Output):
     pass

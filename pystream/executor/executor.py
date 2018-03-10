@@ -57,6 +57,10 @@ class Executor(object):
     def handle_event(self, event):
         return None
 
+    def start(self):
+        for _ in self:
+            continue
+
     def __or__(self, executor):
         source = executor             # type: Executor
         while source._source:
