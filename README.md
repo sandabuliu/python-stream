@@ -93,7 +93,7 @@ for i in m:
 
 执行结果
 
-```python
+```
 [94]
 [94, 99]
 [18, 94, 99]
@@ -120,7 +120,7 @@ for item in s:
 
 执行结果
 
-```python
+```
 {'status': '400', 'body_bytes_sent': 173, 'remote_user': '-', 'http_referer': '-', 'remote_addr': '198.35.46.20', 'request': '\\x05\\x01\\x00', 'version': None, 'http_user_agent': '-', 'time_local': datetime.datetime(2017, 2, 15, 13, 11, 3), 'path': None, 'method': None}
 {'status': '400', 'body_bytes_sent': 173, 'remote_user': '-', 'http_referer': '-', 'remote_addr': '198.35.46.20', 'request': '\\x05\\x01\\x00', 'version': None, 'http_user_agent': '-', 'time_local': datetime.datetime(2017, 2, 15, 13, 11, 3), 'path': None, 'method': None}
 {'status': '400', 'body_bytes_sent': 173, 'remote_user': '-', 'http_referer': '-', 'remote_addr': '198.35.46.20', 'request': '\\x05\\x01\\x00', 'version': None, 'http_user_agent': '-', 'time_local': datetime.datetime(2017, 2, 15, 13, 11, 3), 'path': None, 'method': None}
@@ -150,6 +150,7 @@ conn.close()
 ##### 读取文件数据
 
 ```python
+from pystream.executor.source import Tail, File, Csv
 Tail('/var/log/nginx/access.log')
 File('/var/log/nginx/*.log')
 Csv('/tmp/test*.csv')
@@ -158,6 +159,7 @@ Csv('/tmp/test*.csv')
 ##### 读取 TCP 流数据
 
 ```python
+from pystream.executor.source import TCPClient
 TCPClient('/tmp/pystream.sock')
 TCPClient(('127.0.0.1', 10000))
 ```
@@ -165,7 +167,11 @@ TCPClient(('127.0.0.1', 10000))
 ##### 读取 python 数据
 
 ```python
+from Queue import Queue as Q
 from random import randint
+from pystream.executor.source import Memory, Faker, Queue
+queue = Q(10)
+
 Memory([1, 2, 3, 4])
 Faker(randint, 1000)
 Queue(queue)
@@ -174,6 +180,7 @@ Queue(queue)
 ##### 读取常用模块数据
 
 ```python
+from pystream.executor.source import SQL, Kafka
 SQL(conn, 'select * from faker')   # 读取数据库数据
 Kafka('topic1', '127.0.0.1:9092')  # 读取 kafka 数据
 ```
@@ -182,6 +189,7 @@ Kafka('topic1', '127.0.0.1:9092')  # 读取 kafka 数据
 ##### 输出到文件
 
 ```python
+from pystream.executor.output import File, Csv
 File('/tmp/output')
 Csv('/tmp/output.csv')
 ```
@@ -189,12 +197,14 @@ Csv('/tmp/output.csv')
 ##### 通过HTTP输出
 
 ```python
+from pystream.executor.output import HTTPRequest
 HTTPRequest('http://127.0.0.1/api/data')
 ```
 
 ##### 输出到kafka
 
 ```python
+from pystream.executor.output import Kafka
 Kafka('topic', '127.0.0.1:9092')
 ```
 
