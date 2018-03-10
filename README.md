@@ -106,6 +106,29 @@ for i in m:
 [3, 16, 18, 26, 40, 63, 83, 83, 94, 99]
 ```
 
+##### 在 hadoop 中使用
+###### wordcount
+
+###### mapper.py
+```python
+from pystream.executor.source import Stdin
+from pystream.executor.executor import Map, Iterator
+from pystream.executor.output import Stdout
+
+s = Stdin() | Map(lambda x: x.strip().split()) | Iterator(lambda x: "%s\t1" % x) | Stdout()
+s.start()
+```
+
+###### reducer.py
+```python
+from pystream.executor.source import Stdin
+from pystream.executor.executor import Map, ReducebySortedKey
+from pystream.executor.output import Stdout
+
+s = Stdin() | Map(lambda x: x.strip().split('\t')) | ReducebySortedKey(lambda x, y: x+y) | Stdout()
+s.start()
+```
+
 ##### 解析 NGINX 日志
 ```python
 from pystream.config import rule

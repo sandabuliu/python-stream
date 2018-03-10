@@ -226,6 +226,31 @@ class ReducebyKey(Executor):
         return key, self.data[key]
 
 
+class ReducebySortedKey(Executor):
+    def __init__(self, function, **kwargs):
+        super(ReducebySortedKey, self).__init__(**kwargs)
+        self.func = function
+        self.key = None
+        self.value = None
+
+    def handle(self, item):
+        key, value = item
+        if key == self.key:
+            self.value = self.func(self.value, value)
+            return None
+        result = (self.key, self.value)
+        self.key = key
+        self.value = value
+        if result[0]:
+            return result
+
+    def __iter__(self):
+        for item in super(ReducebySortedKey, self).__iter__():
+            yield item
+        if self.key:
+            yield self.key, self.value
+
+
 class Group(Executor):
     def __init__(self, function=None, size=None, timeout=None, window=None, **kwargs):
         super(Group, self).__init__(**kwargs)
