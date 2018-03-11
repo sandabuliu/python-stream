@@ -125,7 +125,7 @@ from pystream.executor.source import Stdin
 from pystream.executor.executor import Map, ReducebySortedKey
 from pystream.executor.output import Stdout
 
-s = Stdin() | Map(lambda x: x.strip().split('\t')) | ReducebySortedKey(lambda x, y: x+y) | Stdout()
+s = Stdin() | Map(lambda x: x.strip().split('\t')) | ReducebySortedKey(lambda x, y: int(x)+int(y)) | Map(lambda x: '%s\t%s' % x) | Stdout()
 s.start()
 ```
 
