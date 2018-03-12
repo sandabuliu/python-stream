@@ -221,8 +221,10 @@ class Stdin(Executor):
     def __iter__(self):
         while True:
             try:
-                line = sys.stdin.readline().strip()
-                yield line
+                line = sys.stdin.readline()
+                if not line:
+                    break
+                yield line.strip()
             except KeyboardInterrupt:
                 break
 
