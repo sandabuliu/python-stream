@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import re
 import time
 import json
 import msgpack
@@ -339,3 +340,17 @@ class Iterator(Executor):
                 continue
             for item in items:
                 yield self.func(item)
+
+
+class Regex(Executor):
+    def __init__(self, pattern, **kwargs):
+        super(Regex, self).__init__(**kwargs)
+        self.regex = pattern
+        self.pattern = re.compile(pattern)
+
+    def handle(self, item):
+        res = re.match(self.pattern, item)
+        ret = res.groupdict()
+        if not ret:
+            return res.groups()
+        return ret
